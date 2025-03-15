@@ -1,73 +1,63 @@
 # Application
-from datetime import datetime, timedelta
+import datetime
 import calendar
 class MeetingScheduler:
-    def __init__(self):
-        self.working_hours_start = 9
-        self.working_hours_end = 17
-        self.public_holidays = {
-            "01-01": "New Year's Day",
-            "12-25": "Christmas",
-            "07-04": "Independence Day"
-        }
-        self.users_meetings = {}
-    def is_working_day(self, date: datetime):
-        """Check if the given date is a working day (not a weekend or holiday)."""
-        day_of_week = date.weekday() 
-        if day_of_week >= 5: 
-            return False
-        date_str = date.strftime("%m-%d")
-        if date_str in self.public_holidays:
-            return False
-        return True
-    def schedule_meeting(self, user: str, meeting_date: datetime, duration_minutes: int):
-        """Schedule a meeting for a user."""
-        if not self.is_working_day(meeting_date):
-            print(f"Cannot schedule meeting on {meeting_date.strftime('%Y-%m-%d')}, it's not a working day.")
-            return False
-        if not (self.working_hours_start <= meeting_date.hour < self.working_hours_end):
-            print(f"Meeting time must be within working hours ({self.working_hours_start}:00 to {self.working_hours_end}:00).")
-            return False
-        if user not in self.users_meetings:
-            self.users_meetings[user] = []
-        for existing_meeting in self.users_meetings[user]:
-            existing_start, existing_end = existing_meeting
-            if not (meeting_date + timedelta(minutes=duration_minutes) <= existing_start or meeting_date >= existing_end):
-                print(f"Meeting time overlaps with an existing meeting from {existing_start} to {existing_end}.")
+    def __init__(self, working_hours=(9, 17), holidays=None):
+        self.working_hours = working_hours
+        self.holidays = holidays if holidays else []
+        self.schedule = {}
+    def is_working_day(self, date):
+        return date.weekday() < 5 and date not in self.holidays
+    def is_time_slot_available(self, user, start_time, end_time):
+        if user not in self.schedule:
+            return True
+        for meeting in self.schedule[user]:
+            if (start_time < meeting[1] and end_time > meeting[0]):
                 return False
-        meeting_end = meeting_date + timedelta(minutes=duration_minutes)
-        self.users_meetings[user].append((meeting_date, meeting_end))
-        self.users_meetings[user] = sorted(self.users_meetings[user])  # Sort by meeting start time
-        print(f"Meeting scheduled for {user} on {meeting_date.strftime('%Y-%m-%d %H:%M:%S')} for {duration_minutes} minutes.")
         return True
-    def check_available_slots(self, user: str, date: datetime):
-        """Show available time slots for the given date."""
+    def schedule_meeting(self, user, date, start_hour, end_hour):
+        date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
+        start_time = datetime.datetime.combine(date, datetime.time(start_hour))
+        end_time = datetime.datetime.combine(date, datetime.time(end_hour))
+        if not self.is_working_day(date):
+            return f"{date} is not a working day."
+        if not self.is_time_slot_available(user, start_time, end_time):
+            return "Time slot is not available."
+        if user not in self.schedule:
+            self.schedule[user] = []
+        self.schedule[user].append((start_time, end_time))
+        return f"Meeting scheduled for {user} on {date} from {start_hour}:00 to {end_hour}:00."
+    def check_available_slots(self, user, date):
+        date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
+        if not self.is_working_day(date):
+            return f"{date} is not a working day."
         available_slots = []
-        if user not in self.users_meetings:
-            self.users_meetings[user] = []
-        for hour in range(self.working_hours_start, self.working_hours_end):
-            for minute in [0, 30]:
-                meeting_start = datetime(date.year, date.month, date.day, hour, minute)
-                meeting_end = meeting_start + timedelta(minutes=30)  # Default duration is 30 minutes
-                if self.is_working_day(meeting_start) and all(
-                    not (meeting_start < end and meeting_end > start)
-                    for start, end in self.users_meetings[user]
-                ):
-                    available_slots.append(meeting_start.strftime("%H:%M"))
-        if available_slots:
-            print(f"Available slots for {user} on {date.strftime('%Y-%m-%d')}: {', '.join(available_slots)}")
+        start_of_day = datetime.datetime.combine(date, datetime.time(self.working_hours[0]))
+        end_of_day = datetime.datetime.combine(date, datetime.time(self.working_hours[1]))
+        if user in self.schedule:
+            booked_slots = self.schedule[user]
+            booked_slots.sort()  # Sort by start time
+            last_end_time = start_of_day
+            for meeting in booked_slots:
+                if last_end_time < meeting[0]:
+                    available_slots.append((last_end_time, meeting[0]))
+                last_end_time = max(last_end_time, meeting[1])
+            if last_end_time < end_of_day:
+                available_slots.append((last_end_time, end_of_day))
         else:
-            print(f"No available slots for {user} on {date.strftime('%Y-%m-%d')}.")
-    def view_scheduled_meetings(self, user: str):
-        """Display scheduled meetings for a user."""
-        if user not in self.users_meetings:
-            print(f"No meetings scheduled for {user}.")
-            return 
-        print(f"Scheduled meetings for {user}:")
-        for start, end in self.users_meetings[user]:
-            print(f"- From {start.strftime('%Y-%m-%d %H:%M:%S')} to {end.strftime('%Y-%m-%d %H:%M:%S')}")
-scheduler = MeetingScheduler()
-scheduler.schedule_meeting("Migule", datetime(2025, 3, 16, 10, 0), 60)
-scheduler.schedule_meeting("Migule", datetime(2025, 2, 17, 11, 0), 30)  
-scheduler.check_available_slots("Migule", datetime(2025, 3, 16))
-scheduler.view_scheduled_meetings("Migule")
+            available_slots.append((start_of_day, end_of_day))
+        return available_slots
+    def view_scheduled_meetings(self, user):
+        if user not in self.schedule or not self.schedule[user]:
+            return "No scheduled meetings."
+        return self.schedule[user]
+if __name__ == "__main__":
+    holidays = [datetime.date(2025, 1, 1), datetime.date(2025, 12, 25)]  # New Year's Day and Christmas
+    scheduler = MeetingScheduler(holidays=holidays)
+    print(scheduler.schedule_meeting("Migule", "2025-03-18", 10, 11))
+    print(scheduler.schedule_meeting("Migule", "2025-04-18", 11, 12))  # Should succeed
+    print(scheduler.schedule_meeting("Migule", "2025-05-18", 10, 11))  # Should fail (overlap)
+    available_slots = scheduler.check_available_slots("Migule", "2025-05-18")
+    print("Available slots for Migule on 2025-05-18:", available_slots)
+    meetings = scheduler.view_scheduled_meetings("Migule")
+    print("Scheduled meetings for Migule:", meetings)
