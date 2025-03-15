@@ -52,12 +52,10 @@ class MeetingScheduler:
             return "No scheduled meetings."
         return self.schedule[user]
 if __name__ == "__main__":
-    holidays = [datetime.date(2025, 1, 1), datetime.date(2025, 12, 25)]  # New Year's Day and Christmas
+    holidays = [datetime.date(2025, 1, 1), datetime.date(2025, 12, 25)] 
     scheduler = MeetingScheduler(holidays=holidays)
     print(scheduler.schedule_meeting("Migule", "2025-03-18", 10, 11))
-    print(scheduler.schedule_meeting("Migule", "2025-04-18", 11, 12))  # Should succeed
-    print(scheduler.schedule_meeting("Migule", "2025-05-18", 10, 11))  # Should fail (overlap)
-    available_slots = scheduler.check_available_slots("Migule", "2025-05-18")
-    print("Available slots for Migule on 2025-05-18:", available_slots)
+    print(scheduler.schedule_meeting("Migule", "2025-04-18", 11, 12)) 
+    print(scheduler.schedule_meeting("Migule", "2025-05-18", 10, 11))  
     meetings = scheduler.view_scheduled_meetings("Migule")
     print("Scheduled meetings for Migule:", meetings)
